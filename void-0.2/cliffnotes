@@ -1,0 +1,8 @@
+hmm, what about files or projects so small they are only a tiny file and
+dont even have a project directory to sit in? 
+
+I guess you'll have to make a dir for them, then put it in with the
+corresponding VOIDINFO file next to it .. oh well
+
+unless we can think of something, maybe bunching them into 'randomscripts'
+project..hmm

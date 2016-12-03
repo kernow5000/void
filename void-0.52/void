@@ -1,0 +1,430 @@
+
+
+# void source code management and archive tool
+# always work in progress
+
+# about information
+voidVersionString="Void v0.52, 17/06/2010"
+
+# location of config file
+voidConfig=$HOME/.void.conf
+
+# for debian based systems
+alias echo='echo -e'
+
+# check a variable is defined
+function v_exists() {
+  if [ -z $1 ]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+# check a file exists and is readable
+function f_exists() {
+  file=$1
+  if [ -e $file ]; then
+    # exists, check is readable
+    if [ -r $file ]; then
+      # exists and readable
+      return 0
+    else
+      # not readable
+      return 2
+    fi
+  else
+    # doesn't exist
+    return 1
+  fi
+}
+
+# check argument isn't empty
+function checkArg() {
+  if [ -z $project ]; then
+    echo "No project specified - use 'void list' to see a list of projects."
+    exit 1
+  else
+    return 0
+  fi
+}
+
+# check config file
+function checkConfig() {
+  f_exists ${voidConfig}
+  r=$?
+  if [ $r -eq 1 ]; then
+    echo "Config file not found"
+    exit 1
+  else 
+    if [ $r -eq 2 ]; then
+      echo "Config found, but not readable"
+      exit 1
+      else
+	if [ $r -eq 0 ]; then
+	  # all fine, parse config
+	  source $voidConfig
+	  # check what variables the config has defined
+	  if [ -z $void ]; then 
+	    if [ -z $VOID ]; then
+	      echo "no void variable specified in config"
+	      exit 1
+	    else
+	      void=$VOID
+	      unset VOID
+	    fi
+          fi
+	  # check optional variables - these will default if undefined in config
+	  v_exists $voidFileExtension
+	  r=$?
+	  if [ $r -eq 1 ]; then
+	    voidFileExtension="void"
+	  fi
+  
+          v_exists $voidInfoFilename
+	  r=$?
+	  if [ $r -eq 1 ]; then 
+	    voidInfoFilename="VOIDINFO"
+	  fi  
+	fi
+    fi
+  fi
+}
+
+# check project repository exists
+function checkVoidExists() {
+  checkConfig
+  if [ -e $void ]; then
+    # Exists
+    return 0 
+  else
+    # Doesn't exist
+    echo "Void $void doesn't exist, please create one first"
+    exit 1
+  fi
+}
+
+# check project repository isn't empty
+function checkVoidProjects() {
+  checkConfig
+  checkVoidExists
+  projectCount=$(ls -1 $void/*.$voidFileExtension | wc -l)
+  if [ $projectCount = 0 ]; then
+    echo "You haven't checked in any projects yet"
+    exit 1
+  else 
+    return 0
+  fi
+}
+
+# create a new repository
+function create() {
+  checkConfig
+  checkVoidExists
+  r=$?
+  if [ $r -ne 0 ]; then
+    echo "Attempting to create $void"
+    mkdir -p "$void"
+    # error check mkdir
+    if [ $? -ne 0 ]; then
+      echo "Error creating void at $void"
+      exit 1
+    else
+      echo "Void $void created successfully"
+    fi
+  else 
+    echo "Void $void exists, skipping creation"
+    exit 1
+  fi
+}
+
+# checkin a project 
+function checkin() {
+  checkConfig
+  checkVoidExists
+  f_exists $voidInfoFilename
+  # we need to check for VOIDINFO as well to maintain backwards compat with older project info files
+  if [ $? -ne 0 ]; then
+    # rename to old project info name (version 4 and below)
+    voidInfoFilename="VOIDINFO"
+    # check to see this exists
+    f_exists $voidInfoFilename
+    if [ $? -ne 0 ]; then
+      echo "No project information file found"
+      echo "Please create a corresponding project information file in this directory"
+      exit 1
+    fi
+  fi
+  if [ $? = 0 ]; then # should check readable and not just exists
+    echo "Reading project information file $voidInfoFilename"
+    echo
+    source $voidInfoFilename
+    # we should now v_exist each variable in here.. one day
+    echo "\tProject Name: \t\t $PROJECT_NAME"
+    echo "\tProject Description: \t $PROJECT_DESCRIPTION"
+    echo "\tProject Author: \t $PROJECT_AUTHOR"
+    echo "\tProject Version: \t $PROJECT_VERSION"
+    echo "\nAdding project to void at $void"
+    # create void project and place in repository
+    cd ..
+    tar cvf /tmp/$PROJECT_NAME.tar `basename $OLDPWD`/
+    fullProjectName=$PROJECT_NAME-$PROJECT_VERSION.$voidFileExtension
+    mv /tmp/$PROJECT_NAME.tar $void/$fullProjectName
+    echo "\nProject $fullProjectName added to void successfully"
+  fi
+}
+
+# checkout a project 
+function checkout() {
+  checkConfig
+  checkVoidExists
+  checkVoidProjects
+  checkArg
+  # if we are here, check out 
+  echo "Checking out '$project'"
+  test -r $void/$project.$voidFileExtension
+  if [ $? = 1 ]; then
+    echo "Invalid project specified, use 'void list' to see a list of projects."
+    exit 1
+    else 
+      # untar to current directory
+      tar xf $void/$project.$voidFileExtension
+      # check if it untarred ok
+      if [ $? = 0 ]; then
+        echo "Project '$project' checked out successfully"
+        exit 0
+      else
+        echo "Error in checking out project '$project'"
+        exit 1
+      fi
+  fi
+}
+
+# list projects in repository
+function list() {
+  checkConfig
+  checkVoidExists
+  checkVoidProjects
+  # if we are here, just list the projects
+  #ls -1 $void/*.$voidFileExtension
+  ls -1 $void
+}
+
+# show files in project
+function files() {
+  checkConfig
+  checkVoidExists
+  checkVoidProjects
+  checkArg
+  # otherwise, show list of files
+  echo "Listing files in project $project"
+  test -r $void/$project.$voidFileExtension
+  if [ $? = 1 ]; then
+    echo "Invalid project specified, use 'void list' to see a list of projects."
+    exit 1
+    else 
+      # list files in project
+      tar ft $void/$project.$voidFileExtension
+      # check if tar listed the files ok
+      if [ $? = 0 ]; then
+        exit 0
+      else
+        echo "Error in listing files for project '$project'"
+        exit 1
+      fi
+  fi
+}
+
+# delete project from repository
+function delete() {
+  checkConfig
+  checkVoidExists
+  checkVoidProjects
+  checkArg
+  # otherwise, try to delete project
+    echo "Deleting '$project'"
+  test -r $void/$project.$voidFileExtension
+  if [ $? = 1 ]; then
+    echo "Invalid project specified, use 'void list' to see a list of projects."
+    exit 1
+    else 
+      # delete project
+      rm $void/$project.$voidFileExtension
+      # check if it deleted the project ok
+      if [ $? = 0 ]; then
+        exit 0
+      else
+        echo "Error deleting project '$project'"
+        exit 1
+      fi
+  fi
+}
+
+# checkout project as tarball
+function tarball() {
+  checkConfig
+  checkVoidExists
+  checkVoidProjects
+  checkArg
+  # if we are here, check out as tarball
+  echo "Checking out '$project' as tarball"
+  test -r $void/$project.$voidFileExtension
+  if [ $? = 1 ]; then
+    echo "Invalid project specified, use 'void list' to see a list of projects."
+    exit 1
+    else 
+      # get it out as tarball
+      cp $void/$project.$voidFileExtension ./$project.tar
+      # check if it dumped the tarball ok
+      if [ $? = 0 ]; then
+        echo "Project '$project' checked out as tarball successfully"
+        exit 0
+      else
+        echo "Error in checking out project '$project'"
+        exit 1
+      fi
+  fi
+}
+
+function distrib() {
+  checkConfig
+  echo "Creating tarball of current project"
+  f_exists $voidInfoFilename
+  # we need to check for VOIDINFO as well to maintain backwards compat with older project info files
+  if [ $? -ne 0 ]; then
+    # rename to old project info name (version 4 and below)
+    voidInfoFilename="VOIDINFO"
+    # check to see this exists
+    f_exists $voidInfoFilename
+    if [ $? -ne 0 ]; then
+      echo "No project information file found"
+      echo "Please create a corresponding project information file in this directory"
+      exit 1
+    fi
+  fi
+  if [ $? = 0 ]; then # should check readable and not just exists
+    echo "Reading project information file $voidInfoFilename"
+    # we should now v_exist each variable in here.. one day
+    source $voidInfoFilename
+    # create tarball of current directory and place in current directory
+    cd ..
+    tar cvf /tmp/$PROJECT_NAME.tar `basename $OLDPWD`
+    fullProjectName=$PROJECT_NAME-$PROJECT_VERSION.tar
+    cd $OLDPWD
+    mv /tmp/$PROJECT_NAME.tar ./$fullProjectName
+    echo "\nProject $fullProjectName distribution created successfully"
+  fi
+}
+
+# report total size of repository
+function size() {
+  checkConfig
+  checkVoidExists
+  checkVoidProjects
+  # otherwise just report size
+  s=$(du -sh $void)
+  echo "Total size of void is $s"
+}
+
+# count total projects in repository
+function count() {
+  checkConfig
+  checkVoidExists
+  checkVoidProjects
+  # otherwise just report project count
+  projectCount=$(ls -1 $void/*.$voidFileExtension | wc -l)
+  echo "$void contains $projectCount projects"
+}
+
+# display help 
+function showHelp() {
+  echo
+  echo "About Void:"
+  echo "Void has been designed to be as simple as possible to use."
+  echo "Once you have created a VOIDINFO file in your project directory,"
+  echo "all you have to do is add the project to the Void, or update it in future"
+  echo "coding sessions.\n"
+  echo "Usage:"
+  echo 
+  echo "\tvoid create \t\t\tCreates a project directory."
+  echo "\tvoid checkin \t\t\tChecks in a new project."
+  echo "\tvoid checkout <project>\t\tChecks out a project."
+  echo "\tvoid list \t\t\tList all projects."
+  echo "\tvoid files \t\t\tList files inside a project."
+  echo "\tvoid delete <project>\t\tDeletes an existing project."
+  #echo "\tvoid snapshot \t\t\tCreate void filesystem snapshot."
+  #echo "\tvoid dump  \t\t\tCreate a void project dump."
+  echo "\tvoid tarball <project>\t\tChecks out a distribution tarball."
+  echo "\tvoid distrib\t\t\t Creates a tarball of the current project."
+  echo "\tvoid count\t\t\tCounts the total number of project."
+  echo "\tvoid size\t\t\tDisplays the total void size."
+  echo "\tvoid version\t\t\tDisplays version information."
+  echo "\tvoid help\t\t\tDisplays this help information."
+  echo
+  exit 0
+}
+
+# display version information
+function showVersion() {
+  echo $voidVersionString
+  exit 0
+}
+
+# prompt on no arguments and quit
+function noArgPrompt() {
+  echo -e "Void source code management and archiving tool, use 'void help' for usage information."
+  exit 1
+}
+
+# check arguments and run corresponding function
+test -z $1
+project=$2
+if [ -z $1 ]; then
+  # no arguments, just display helpful prompt
+  noArgPrompt
+else
+  case "$1" in
+  "create")
+  create;
+  ;;
+  "checkin")
+  checkin;
+  ;;
+  "checkout")
+  checkout;
+  ;;
+  "delete")
+  delete;
+  ;;
+  "list")
+  list;
+  ;;
+  "files")
+  files;
+  ;;
+  "tarball")
+  tarball;
+  ;;
+  "count")
+  count;
+  ;;
+  "size")
+  size;
+  ;;
+  "distrib")
+  distrib;
+  ;;
+  "version")
+  showVersion;
+  ;;
+  "help")
+  showHelp;
+  ;;
+  *)
+  # default option if no match
+  noArgPrompt;
+  ;;
+  esac
+fi
+
+# end of script

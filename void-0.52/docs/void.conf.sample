@@ -1,0 +1,17 @@
+# Void configuration options
+# Now supports $VOID/$void for compatibility with pre-v5 configs
+# only void option is necessary, others are optional and will use sensible defaults
+
+# Location of your void project repository
+void="/home/shaun/projects"
+
+# Extension for project files
+voidFileExtension="voidproject"
+
+# Name of your project information file (defaults to VOIDINFO for backwards compatibility)
+voidInfoFilename="project.info"
+
+# These two aren't implemented yet but will both default to 'no'
+voidSnapshots="no"
+voidDumps="no"
+

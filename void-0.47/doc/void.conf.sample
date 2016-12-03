@@ -1,0 +1,7 @@
+# Void configuration options
+# this needs to be named ~/.void.conf
+
+VOID=$HOME/projects
+
+# in future there will be more options
+# default file extension etc

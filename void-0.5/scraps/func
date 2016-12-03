@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# simple function to see if a variable exists
+function var_x() {
+  test -z ${1}
+  if [ $? = 0 ]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+
+
+
+
+
+
+
+var_x $1
+if [ $? = 0 ]; then
+  echo "Variable exists and has data"
+else
+  if [ $? = 1 ]; then
+    echo "Variable is empty or doesn't exist"
+  fi
+fi
+

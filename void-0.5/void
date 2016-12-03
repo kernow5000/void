@@ -1,0 +1,302 @@
+#!/bin/sh
+
+# about information
+voidVersionString="Void v0.5, 16/06/2009"
+
+#voidConfig=$HOME/.void.conf
+voidConfig=./void.conf
+
+# for debian based systems
+alias echo='echo -e'
+
+
+# check a variable is defined
+function v_exists() {
+  if [ -z ${1} ]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+# check a file exists and is readable
+function f_exists() {
+  file=$1
+  if [ -e $file ]; then
+    # exists, check is readable
+    if [ -r $file ]; then
+      # exists and readable
+      return 0
+    else
+      # not readable
+      return 2
+    fi
+  else
+    # doesn't exist
+    return 1
+  fi
+}
+
+function checkVoidExists() {
+  checkConfig
+  #echo "Checking $void"
+  if [ -e $void ]; then
+    # Exists
+    return 0 
+  else
+    # Doesn't exist
+    return 1
+  fi
+}
+
+
+function create() {
+  checkConfig
+  checkVoidExists
+  r=$?
+  if [ $r -ne 0 ]; then
+    echo "Attempting to create $void"
+    mkdir -p "$void"
+    # error check mkdir
+    if [ $? -ne 0 ]; then
+      echo "Error creating void at $void"
+      echo
+      exit 1
+    else
+      echo "Void $void created successfully"
+    fi
+  else 
+    echo "Void $void exists, skipping creation"
+  fi
+  
+  echo
+}
+
+
+function checkin() {
+  checkConfig
+  checkVoidExists
+  f_exists $voidInfoFilename
+  if [ $? = 0 ]; then # should check readable and not just exists
+    echo "Reading project information file $voidInfoFilename"
+    echo
+    source $voidInfoFilename
+    # we should now v_exist each variable in here.. eventually
+    # check each one exists
+    echo "\tProject Name: \t\t $PROJECT_NAME"
+    echo "\tProject Description: \t $PROJECT_DESCRIPTION"
+    echo "\tProject Author: \t $PROJECT_AUTHOR"
+    echo "\tProject Version: \t $PROJECT_VERSION"
+    echo "\nAdding project to void at $void"
+    cd ..
+    tar cvf $PROJECT_NAME.tar `basename $OLDPWD`/*
+    mv $PROJECT_NAME.tar $void/$PROJECT_NAME-$PROJECT_VERSION.void
+    echo "\nProject $PROJECT_NAME added to void successfully"
+  else
+    echo "Error - no $voidInfoFilename project information file found"
+    echo "Please create a corresponding $voidInfoFilename in this project directory"
+    exit 1
+  fi
+}
+
+
+function list() {
+  checkConfig
+  checkVoidExists
+  r=$?
+  if [ $r -ne 0 ]; then
+    echo "Void $void doesn't exist, please create one first"
+    exit 1
+  else
+    projectCount=$(ls -1 $void | wc -l)
+    if [ $projectCount = 0 ]; then 
+      echo "You haven't checked in any projects yet."
+      echo
+      exit 1
+    fi
+    # otherwise just list them
+    ls -1 $void
+  fi
+}
+
+function size() {
+  checkConfig
+  checkVoidExists
+  r=$?
+  if [ $r -ne 0 ]; then
+    echo "Void $void doesn't exist, please create one first"
+    exit 1
+  else
+    projectCount=$(ls -1 $void | wc -l)
+    if [ $projectCount = 0 ]; then 
+      echo "You haven't checked in any projects yet."
+      echo
+      exit 1
+    fi
+    # otherwise just report size
+    # ignore snapshot sizes in total, bug.. ?
+    s=$(du -sh $void/)
+     echo "Total size of void is $s\n"
+  fi
+}
+
+function count() {
+  checkConfig
+  checkVoidExists
+  if [ $? -ne 0 ]; then
+    echo "Void $void doesn't exist, please create one first"
+    exit 1
+  else
+    projectCount=$(ls -1 $void | wc -l)
+    if [ $projectCount = 0 ]; then 
+      echo
+      echo "You haven't checked in any projects yet."
+      echo
+      exit 1
+    fi
+    # otherwise just report project count
+    projectCount=$(ls -1 $void | wc -l)
+     echo "$void contains $projectCount projects"
+  fi
+  
+  echo
+}
+
+
+
+function parseConfig() {
+  #echo "Parsing config: $voidConfig"
+  source $voidConfig
+  # check what variables the config has defined
+  if [ -z $void ]; then 
+    if [ -z $VOID ]; then
+    echo "no void variable specified in config"
+    exit 1
+    else
+      void=$VOID
+      unset VOID
+    fi
+  fi
+  # check optional variables
+  v_exists $voidFileExtension
+  r=$?
+  if [ $r -eq 1 ]; then
+    voidFileExtension=".void"
+  fi
+  
+  v_exists $voidInfoFilename
+  r=$?
+  if [ $r -eq 1 ]; then 
+    voidInfoFilename="VOIDINFO"
+  fi
+  
+  # need to work out best way to check for
+  # yes/no/random, yes = yes, no=no, random=default
+  # default = no
+  #echo "\$void is $void"
+  #echo "\$voidFileExtension is $voidFileExtension"
+  #echo "\$voidInfoFilename is $voidInfoFilename"
+  #echo "End Parsing config"
+}
+
+# check config file
+function checkConfig() {
+  f_exists ${voidConfig}
+  r=$?
+  if [ $r -eq 1 ]; then
+    echo "Config file not found"
+    exit 1
+    else 
+      if [ $r -eq 2 ]; then
+        echo "Config found, but not readable"
+	exit 1
+	else
+	  if [ $r -eq 0 ]; then
+            #echo "Reading config: $voidConfig"
+	    parseConfig
+	  fi
+      fi
+  fi
+}
+
+
+# display help 
+function showHelp() {
+  echo
+  echo "About Void:"
+  echo "Void has been designed to be as simple as possible to use."
+  echo "Once you have created a VOIDINFO file in your project directory,"
+  echo "all you have to do is add the project to the Void, or update it in future"
+  echo "coding sessions.\n"
+  echo "Usage:"
+  echo 
+  echo "\tvoid create \t\t\tCreates a project directory."
+  echo "\tvoid checkin \t\t\tChecks in a new project to the void."
+  echo "\tvoid checkout <project>\t\tChecks out a project from the void."
+  echo "\tvoid list \t\t\tList all projects."
+  echo "\tvoid search \t\t\tSearch for a project."
+  echo "\tvoid files \t\t\tList files inside a project."
+  echo "\tvoid snapshot \t\t\tCreate void filesystem snapshot."
+  echo "\tvoid dump  \t\t\tCreate a void project dump."
+  echo "\tvoid tarball <project>\t\tChecks out a distribution tarball from the void."
+  echo "\tvoid delete <project>\t\tDeletes an existing project from the void."
+  echo "\tvoid count\t\t\tCounts the number of projects in the void."
+  echo "\tvoid size\t\t\tDisplays the size of the void."
+  echo "\tvoid version\t\t\tDisplays void version information."
+  echo "\tvoid help\t\t\tDisplays this help information."
+  echo
+  exit 0
+}
+
+# display void version info
+function showVersion() {
+  echo $voidVersionString
+  exit 0
+}
+
+# prompt and quit on no arguments
+function noArgPrompt() {
+  echo -e "Void source code management for small projects, use 'void help' for usage information."
+  exit 1
+}
+
+
+# work out the command line arguments, and call the right function
+test -z $1
+if [ -z $1 ]; then
+  # help or argprompt?
+  noArgPrompt
+else
+  case "$1" in
+  "create")
+  create;
+  ;;
+  "checkin")
+  checkin;
+  ;;
+  "list")
+  list;
+  ;;
+  "count")
+  count;
+  ;;
+  "size")
+  size;
+  ;;
+  "version")
+  showVersion;
+  ;;
+  "help")
+  showHelp;
+  ;;
+  "readconfig") # just for debugging, will be removed
+  checkConfig;
+  ;;
+  *)
+  # default option if no match
+  noArgPrompt;
+  ;;
+  esac
+fi
+
+# end of script

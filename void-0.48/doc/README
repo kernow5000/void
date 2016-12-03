@@ -1,0 +1,23 @@
+what is this piece of shit this time?
+
+its about me being more bored than normal
+
+
+I want something to manage my crap projects, in source code form.
+
+so i'd have $HOME/dev as my project place as usual, but it would be a hardcoded environment
+variable in a dotfile config or something, and the void script would manage
+the repository, probably $HOME/dev, that would be full of TARBALLS only.
+
+you'd never need to go in there yourself unless you want to have a look
+but it would only be a load of tarballs anyway
+
+you should use the checkout, list, checkin options to the void script in
+order to check in and out of the repository, how are we to deal with
+versioning control?
+
+maybe a .void file in the same directory or VOID in your project dir, could
+contain the name of the project, a little description, the version number
+(what about individual version numbers on source modules), and what else?
+
+hmm

@@ -1,0 +1,308 @@
+#!/bin/sh
+
+# void 5 Work in progress
+# kernow 15/6/09
+# still no version history/locking yet
+# still no algorithm thought of yet thats any good
+
+
+# about information
+voidVersionString="Void v0.5, 27/05/2009"
+
+# different config locations it supports, first will be the default
+# if not found, it'll look for the next, and so on
+voidConfig=$HOME/.void.conf
+voidConfigDotfile=$HOME/void.conf
+voidConfigLocal=$PWD/void.conf
+voidConfigLocalDotfile=$PWD/.void.conf
+
+# for debian based systems
+alias echo='echo -e'
+
+
+# function to see if a variable exists
+function var_x() {
+  if [ -z ${1} ]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+# function to check void exists
+# this is horrible and bugged to fuck
+function voidExists() {
+  echo "Checking void exists"
+  readConfig
+  echo $void
+  test -d ${void}
+  echo $?
+  if [ $? = 0 ]; then
+    echo "Void $void exists"
+    test -w ${void}
+    echo $?
+    if [ $? = 0 ]; then
+      echo "Void $void is writable"
+      exit 0
+    else
+      echo "Void $void exists but isn't writable"
+    fi
+    exit 0
+  else
+    echo "Void $void doesn't exist"
+    exit 1
+  fi
+}
+
+# create a project void if one doesn't exist
+# check one exists already, if so, no need to make one
+function create()
+{
+ # check void config is valid and readable
+ voidExists
+ # hmm, readconfig checks the void itself
+}
+
+# list the projects 
+function list() 
+{
+  # check void config is valid and readable
+  readConfig
+  voidExists
+  projectCount=$(ls -1 $void | wc -l)
+  if [ $projectCount = 0 ]; then 
+    echo
+    echo "You haven't checked in any projects yet."
+    exit 1
+  fi
+  # otherwise just list them
+  ls -1 $void
+}
+
+function size()
+{
+ # list total size of void
+ readConfig
+ howmany=$(ls -1 $void | wc -l)
+ if [ $howmany = 0 ]; then
+   echo 
+   echo "You haven't checked in any projects yet."
+   exit 1
+ fi
+ # ignore snapshot sizes in total, bug.. 
+ s=$(du -sh $void/)
+ echo "Total size of void is $s\n"
+}
+
+function count()
+{
+  # count how many projects are stored
+  readConfig
+  echo $voidFileExtension
+  total=$(ls -1 $void/*.$voidFileExtension 2> /dev/null | wc -l)
+  echo "Void contains $total projects.\n"
+}
+
+# read the config file, this still has bugs in the config variable parsing logic
+function readConfig() {
+ # check to see which config we have, starting from the default
+ if [ -e ${voidConfigDotfile} ]; then
+   echo "$voidConfigDotfile not found or unreadable."
+   if [ -e ${voidConfig} ]; then
+     echo "$voidConfig not found or unreadable."
+     if [ -e ${voidConfigLocalDotfile} ]; then
+       echo "$voidConfigLocalDotfile not found or unreadable."
+       if [ -e ${voidConfigLocal} ]; then
+         echo "$voidConfigLocal not found or unreadable."
+         echo 
+         echo "You must create a valid config file in one of the following locations."
+         echo
+         echo "\t\$HOME/.void.conf \tAs a dotfile in your \$HOME directory."
+         echo "\t\$HOME/void.conf \tAs a file in your \$HOME directory."
+         echo "\t\$PWD/.void.conf \tAs a dotfile in the current directory."
+         echo "\t\$PWD/void.conf \t\tAs a file in the current directory."
+         echo
+         echo "The last two are usually used for web frontend mode (eventually),"
+         echo "for everyday use, the first option is preferred."
+         echo
+         echo "No working void configs found, exiting."
+         echo 
+         exit 1
+       else
+         CFG=$voidConfigLocal
+       fi
+     else 
+       CFG=$voidConfigLocalDotfile
+     fi
+   else 
+     CFG=$voidConfig
+   fi
+ else
+   CFG=$voidConfigDotfile
+ fi
+   
+ # begin very long config checking logic
+ echo "Debugging $CFG"
+ # test variables exist before actually showing or using them
+ # we might have just sourced a load of garbage as a config file
+ echo $CFG
+ source $CFG
+ 
+ # check what type of $VOID variable we have, upper or lowercase
+ # only a void variable is necessary for a valid config
+ # every other config entry is optional
+ var_x $void
+ if [ $? = 0 ]; then
+   echo "\$void is $void"  
+   void=$void
+ else
+   var_x $VOID
+   if [ $? = 0 ]; then 
+     echo "\$VOID is $VOID"
+     void=$VOID
+   else 
+     echo "No suitable \$VOID variable found in config, exiting."
+     exit 1
+   fi
+ fi
+  
+ # test other v5 only void config options
+ var_x $voidFileExtension
+ if [ $? = 0 ]; then
+   echo "\$voidFileExtension is $voidFileExtension"
+   voidFileExtension=$voidFileExtension
+ else
+   echo "\$voidFileExtension is not set, defaulting to '.void'"
+   voidFileExtension="void"
+ fi
+       
+ var_x $voidInfoFilename
+ if [ $? = 0 ]; then
+   echo "\$voidInfoFilename is $voidInfoFilename"
+   voidInfoFilename=$voidInfoFilename
+ else
+   echo "\$voidInfoFilename is not set, defaulting to 'VOIDINFO'"
+   voidInfoFilename="VOIDINFO"
+ fi
+ 
+ # allow snapshots? if undefined = no, if defined = yes
+ # logic is wrong on these two as it checks if no is set, then if it isn't assumes everything else is wrong, 
+ var_x $voidSnapshots
+ if [ $? = 0 ]; then
+   # only use 'yes' or 'no' for now
+   # if anything other than yes or no, ignore and set default
+   test $voidSnapshots = "no"
+   if [ $? = 1 ]; then
+     echo "\$voidSnapshots is an invalid value, defaulting to 'yes'"
+     voidSnapshots="yes"
+   fi
+ else
+   echo "\$voidSnapshots is not set, defaulting to 'yes'"
+   voidSnapshots="yes"
+ fi
+ 
+ # allow dumps to $PWD? if undefined = no, if defined = yes
+ var_x $voidDumps
+ if [ $? = 0 ]; then
+   # only use 'yes' or 'no' for now
+   # if anything other than yes or no, ignore and set default
+   test $voidDumps = "no"
+   if [ $? = 1 ]; then
+     echo "\$voidDumps is an invalid value, defaulting to 'yes'"
+     voidDumps="yes"
+   fi
+ else
+   echo "\$voidDumps is not set, defaulting to 'yes'"
+   voidDumps="yes"
+ fi
+ 
+ # is that it for now?
+ echo "void : $void"
+ echo "void file extension : $voidFileExtension"
+ echo "void info filename  : $voidInfoFilename"
+ echo "void snapshots      : $voidSnapshots"
+ echo "void dumps          : $voidDumps"
+ echo "End debugging $CFG"
+
+}
+
+
+# display help 
+function showHelp() {
+  echo
+  echo "About Void:"
+  echo "Void has been designed to be as simple as possible to use."
+  echo "Once you have created a VOIDINFO file in your project directory,"
+  echo "all you have to do is add the project to the Void, or update it in future"
+  echo "coding sessions.\n"
+  echo "Usage:"
+  echo 
+  echo "\tvoid create \t\t\tCreates a project directory."
+  echo "\tvoid checkin \t\t\tChecks in a new project to the void."
+  echo "\tvoid checkout <project>\t\tChecks out a project from the void."
+  echo "\tvoid list \t\t\tList all projects."
+  echo "\tvoid search \t\t\tSearch for a project."
+  echo "\tvoid files \t\t\tList files inside a project."
+  echo "\tvoid snapshot \t\t\tCreate void filesystem snapshot."
+  echo "\tvoid dump  \t\t\tCreate a void project dump."
+  echo "\tvoid tarball <project>\t\tChecks out a distribution tarball from the void."
+  echo "\tvoid delete <project>\t\tDeletes an existing project from the void."
+  echo "\tvoid count\t\t\tCounts the number of projects in the void."
+  echo "\tvoid size\t\t\tDisplays the size of the void."
+  echo "\tvoid version\t\t\tDisplays void version information."
+  echo "\tvoid help\t\t\tDisplays this help information."
+  echo
+  exit 0
+}
+
+# display void version info
+function showVersion() {
+  echo $voidVersionString
+  exit 0
+}
+
+# prompt and quit on no arguments
+function noArgPrompt() {
+  echo -e "Void source code management for small projects, use 'void help' for usage information."
+  exit 1
+}
+
+
+
+# work out the command line arguments, and call the right function
+test -z $1
+# on no arguments show this?, or help?
+if [ -z $1 ]; then
+  # help or argprompt?
+  noArgPrompt
+else
+  case "$1" in
+  "create")
+  create;
+  ;;
+  "list")
+  list;
+  ;;
+  "count")
+  count;
+  ;;
+  "size")
+  size;
+  ;;
+  "version")
+  showVersion;
+  ;;
+  "help")
+  showHelp;
+  ;;
+  "readconfig") # just for debugging, will be removed
+  readConfig;
+  ;;
+  *)
+  # default option if no match
+  noArgPrompt;
+  ;;
+  esac
+fi
+
+# end of script

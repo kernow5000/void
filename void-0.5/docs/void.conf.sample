@@ -1,0 +1,10 @@
+# Void configuration options
+# Now supports $VOID/$void for compatibility with pre-v5 configs
+
+void="/mnt/data/projects"
+voidFileExtension=".voidproject"
+voidInfoFilename="project.info"
+voidSnapshots="no"
+voidDumps="no"
+
+# not all actions to options implemented yet

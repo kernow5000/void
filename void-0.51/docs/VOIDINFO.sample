@@ -1,0 +1,6 @@
+# All of these need to be present for the project to be checked in properly
+PROJECT_NAME="my project"
+PROJECT_DESCRIPTION="A little bit of information about my project"
+PROJECT_AUTHOR="me"
+PROJECT_VERSION="0.2"
+

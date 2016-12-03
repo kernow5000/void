@@ -1,0 +1,293 @@
+#!/bin/sh
+
+# this is 0.4, and I'll stop staying it's the final version
+# kernow 23/06/06
+
+# added beta features
+
+# void snapshot, creates a history in the $VOID, uses disk space lots, dont do it often
+# void dump, creates a dump in $PWD of the $VOID, same as void snapshot but local basically
+# void files, show the files for the project, works okay, no paging but it pipes well so meh
+# more intelligent checkin doesnt use directory anymore
+# wildcard support is a bit better at least, but by no means perfect
+# all my v3 voidinfo files are now imported so it seems pointless adding support for v3 projects now
+# void info, list the void comment for the project?, not even started yet
+
+
+VERSIONSTRING="Void v0.4 kernow 2/07/2006"
+
+# location of the Void config file
+VOIDCFG=$HOME/.void.conf
+
+# show a prompt on no arguments
+test -z $1
+if [ "$?" = 0 ]; then
+echo -e "Void source code management for small projects, use 'void help' for usage information."
+exit 1
+fi
+
+# check if help command called
+if [ "$1" = "help" ]; then
+  echo -e "\nAbout Void:"
+  echo -e "Void has been designed to be as simple as possible to use."
+  echo -e "Once you have created a VOIDINFO file in your project directory,"
+  echo -e "all you have to do is add the project to the Void, or update it in future"
+  echo -e "coding sessions.\n"
+  echo -e "Usage:"
+  echo -e "\tvoid checkin \t\t\tChecks in a new project to the void."
+  echo -e "\tvoid checkout <project>\t\tChecks out a project from the void."
+  echo -e "\tvoid list \t\t\tList all projects."
+  echo -e "\tvoid files \t\t\tList files inside a project."
+  # void info is unfinished
+  echo -e "\tvoid info \t\t\tShow void project info."
+  #
+  echo -e "\tvoid snapshot \t\t\tCreate void filesystem snapshot."
+  echo -e "\tvoid dump  \t\t\tCreate a void project dump."
+  echo -e "\tvoid tarball <project>\t\tChecks out a distribution tarball from the void."
+  echo -e "\tvoid delete <project>\t\tDeletes an existing project from the void."
+  echo -e "\tvoid count\t\t\tCounts the number of projects in the void."
+  echo -e "\tvoid size\t\t\tDisplays the size of the void."
+  echo -e "\tvoid version\t\t\tDisplays void version information."
+  echo -e "\tvoid help\t\t\tDisplays this help information."
+  echo -e "\n"
+  exit 0
+fi
+
+
+# check the config exists and is readable
+test -r $VOIDCFG
+if [ $? = "1" ]; then
+  echo -e "Fatal error - no Void config file found at $VOIDCFG"
+  exit 1
+fi
+# this needs to be tweaked for web engine mode, a little
+# so that it doesnt just use $HOME/.void.conf
+# but can use a local per-dir $PWD/.void.conf or something
+
+# source the config file, hope its valid
+source $VOIDCFG
+#echo -e "Void is $VOID"
+
+# check the void exists, if not create it
+test -e $VOID
+if [ $? = "1" ]; then
+  echo -e "Void does not exist, creating project void at $VOID"
+  mkdir $VOID 2> /dev/null
+  if [ $? = "1" ]; then
+    echo -e "Void Error - unable to create $VOID, please specify a valid location, exiting\n"
+    exit 1
+  fi
+fi
+
+if [ "$1" = "checkin" ]; then
+# check we have a voidinfo file in this project directory
+test -r "./VOIDINFO"
+if [ $? = "0" ]; then
+  echo "Reading project information file."
+  source "./VOIDINFO" 
+  # if the void project is an old V3 VOIDINFO style (i.e no project name record) 
+  if [ -z $PROJECT_NAME ]; then
+    echo "Your VOIDINFO file is missing a PROJECT_NAME definition."
+    echo "It could be that the VOIDINFO file is v3 or earlier."
+    echo "v3 VOIDINFO files did not need the definition."
+    exit 1
+  fi
+  # otherwise list the project details before checking in
+  echo -e "\tProject Name \t\t: $PROJECT_NAME"
+  echo -e "\tProject Description \t: $PROJECT_DESCRIPTION"
+  echo -e "\tProject Author \t\t: $PROJECT_AUTHOR"
+  echo -e "\tProject Version \t: $PROJECT_VERSION"
+  echo -e "\nAdding project to Void at $VOID"
+  cd ..
+  tar cvf $PROJECT_NAME.tar `basename $OLDPWD`/*
+  # more intelligent checking when checking in? still?
+  # its better but not perfect
+  if [ -z $PROJECT_VERSION ]; then
+    mv $PROJECT_NAME.tar $VOID/$PROJECT_NAME.void
+  else
+  if [ $PROJECT_VERSION = "" ]; then
+    mv $PROJECT_NAME.tar $VOID/$PROJECT_NAME.void
+  else
+    mv $PROJECT_NAME.tar $VOID/$PROJECT_NAME-$PROJECT_VERSION.void
+  fi
+  fi
+  echo -e "\nProject $PROJECT_NAME added to void successfully."
+else
+  echo "Fatal error - no VOIDINFO project information file found."
+  echo "Please create a corresponding VOIDINFO file in this project directory."
+  exit 1
+fi
+fi
+
+
+if [ "$1" = "checkout" ]; then
+# we need to make sure they specified a legal project
+# and untar it into their current working directory, as a subdirectory
+test -z $2
+if [ "$?" = 0 ]; then
+  echo -e "Error - Please specify a void project name (no .void extension needed) to check out.\n"
+  exit 1
+else
+  VOIDPROJ=$2
+  echo -e "\nChecking out void project '$VOIDPROJ'"
+  echo "Fetching void project '$VOIDPROJ'"
+  # is all this info necessary?
+  tar xvf $VOID/$VOIDPROJ.void -C . 2> /dev/null
+  if [ "$?" = "0" ]; then
+    echo -e "Project '$VOIDPROJ' checked out successfully.\n"
+  else 
+    echo -e "Error in checking out project '$VOIDPROJ'\n"
+    exit 1
+  fi
+  fi
+fi
+
+
+# list projects
+# this has been stripped so it just shows the projects
+# and nothing else, this is so it pipes better and more accurately
+if [ "$1" = "list" ]; then
+howmany=$(ls -1 $VOID | wc -l)
+if [ $howmany = 0 ]; then
+  echo
+  echo -e "You haven't checked in any projects yet."
+  exit 1
+fi
+# list the void projects, maybe for debug only
+ls -1 $VOID
+fi
+
+# count how many projects in the void
+if [ "$1" = "count" ]; then
+# check if theres anything in there so far and list how many projects if any
+VOIDTOTALPRJ=$(ls -1 $VOID/*.void 2> /dev/null| wc -l)
+echo -e "Void contains $VOIDTOTALPRJ projects.\n"
+fi
+
+# dump a tarball of a project asked for
+if [ "$1" = "tarball" ]; then
+  # check second parameter
+  test -z $2
+  if [ "$?" = 0 ]; then
+    echo -e "Error - Please specify a void project name (no .void extension needed).\n"
+    exit 1
+  else
+    VOIDPROJ=$2
+    echo -e "\nChecking out void project '$VOIDPROJ' as tarball"
+    test -r $VOID/$VOIDPROJ.void
+    if [ $? = 1 ]; then
+      echo -e "Invalid void project specified, use 'void list' to see the projects in the void.\n"
+      exit 1
+    else
+    # now get the tarball out of the void
+    echo "Fetching void project '$VOIDPROJ'"
+    cp $VOID/$VOIDPROJ.void ./$VOIDPROJ.tar 2> /dev/null
+    # bug here where it places asterisks in dumped tar filename, if wildcards used
+    # check it dumped to a tarball ok
+    if [ $? = 0 ]; then
+      echo -e "Project '$VOIDPROJ' checked out as tarball successfully.\n"
+    else
+      echo -e "Error in checking out project '$VOIDPROJ'\n"
+      exit 1
+    fi
+    fi
+  fi
+fi
+
+
+# show info/or comment about a file
+if [ "$1" = "info" ]; then
+  echo "not implemented yet."
+  # need to work out how to extract a single file from a tarball
+  # the VOIDINFO file, and read the project_name from it.
+  # and the project_description I guess
+  # and the version
+fi
+
+# show the projects files
+if [ "$1" = "files" ]; then
+  test -z $2
+  if [ $? = 0 ]; then
+    echo -e "Error - Please speciy a void project name (no .void extension needed).\n"
+    exit 1
+  else
+    VOIDPROJ=$2
+    tar ft $VOID/$VOIDPROJ.void 2> /dev/null
+    # some files are gonna need a pager like less, this is messy code
+    # bug for files that dont exist
+    if [ $? != 0 ]; then 
+      echo -e "Error in listing project files for $VOIDPROJ\n"
+      exit 1
+    fi
+  fi
+fi
+
+
+# crap snapshot function
+if [ $1 = "snapshot" ]; then
+  echo "Creating void filesystem snapshot."
+  s=$(echo `date` | tr ' ' _)
+  mkdir $VOID/.void-$s.snapshot
+  cp -R $VOID/* $VOID/.void-$s.snapshot
+  echo "$VOID/.void-$s.snapshot created."
+fi
+
+# dump void to local directory
+if [ $1 = "dump" ]; then
+  echo "Creating void dump to local directory."
+  s=$(echo `date` | tr ' ' _)
+  mkdir void-$s.dump
+  cp -R $VOID/* void-$s.dump
+  echo "void-$s.dump created."
+fi
+
+
+# delete a project in the void
+if [ "$1" = "delete" ]; then
+  # check second parameter
+  test -z $2
+  if [ "$?" = 0 ]; then
+    echo -e "Error - Please specify a void project name (no .void extension needed).\n"
+    exit 1
+  else
+    VOIDPROJ=$2
+    echo -e "\nDeleting void project '$VOIDPROJ'"
+    #test -r $VOID/$VOIDPROJ.void
+    if [ $? = 1 ]; then
+      echo -e "Invalid void project specified, use 'void list' to see the projects in the void.\n"
+      exit 1
+    else
+    # now get the tarball out of the void
+    rm $VOID/$VOIDPROJ 2> /dev/null
+    # check it dumped to a tarball ok
+    if [ $? = 0 ]; then
+      echo -e "Project '$VOIDPROJ' deleted successfully.\n"
+    else
+      echo -e "Error deleting project '$VOIDPROJ'\n"
+      exit 1
+    fi
+    fi
+  fi
+fi
+
+
+# calculate and display the size of the void
+if [ "$1" = "size" ]; then
+howmany=$(ls -1 $VOID | wc -l)
+if [ $howmany = 0 ]; then
+  echo
+  echo -e "You haven't checked in any projects yet."
+  exit 1
+fi
+# ignore snapshot sizes in total, bug.. 
+s=$(du -sh $VOID)
+echo -e "Total size of void is $s\n"
+fi
+
+# display void version info
+if [ "$1" = "version" ]; then
+  echo -e $VERSIONSTRING
+  exit 0
+fi
+
+# end of script
